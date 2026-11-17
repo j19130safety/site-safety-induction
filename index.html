@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>地盤入職訓練二維碼雲端系統</title>
+  <!-- Firebase SDK CDN (Compat v9) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <style>
+    :root {
+      --primary: #1e3a8a;
+      --primary-light: #eff6ff;
+      --zh-color: #0f172a;
+      --booking-color: #d97706;
+      --cic-color: #15803d;
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #cbd5e1;
+      --danger: #dc2626;
+      --success: #16a34a;
+    }
+
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { margin: 0; background: var(--bg); color: var(--text); padding-bottom: 80px; }
+
+    /* Header */
+    header {
+      background: var(--primary);
+      color: #fff;
+      padding: 16px 20px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    header h1 { margin: 0; font-size: 1.2rem; font-weight: 700; }
+    header p { margin: 4px 0 0; font-size: 0.8rem; opacity: 0.85; }
+    .header-actions { display: flex; gap: 8px; align-items: center; }
+    .btn {
+      border: none; border-radius: 8px; padding: 8px 12px; font-size: 0.88rem; font-weight: 600; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px; transition: opacity 0.2s;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-switch { background: #facc15; color: #0f172a; }
+
+    /* Container */
+    .container { max-width: 800px; margin: 20px auto; padding: 0 16px; }
+
+    /* Mode Views */
+    .view-section { display: none; }
+    .view-section.active { display: block; }
+
+    /* Form Card */
+    .form-card {
+      background: var(--card); border-radius: 14px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+      border: 1px solid #e2e8f0; position: relative;
+    }
+    .form-card h2 { margin-top: 0; font-size: 1.25rem; color: var(--primary); border-bottom: 2px solid var(--primary-light); padding-bottom: 8px; }
+    .form-group { margin-bottom: 18px; }
+    .form-group-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .form-group-header label { font-size: 0.9rem; font-weight: 600; margin: 0; }
+
+    .form-group input[type="text"],
+    .form-group input[type="date"],
+    .form-group input[type="password"] {
+      width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; background: #fff;
+    }
+    .form-group input:focus { outline: 2px solid var(--primary); border-color: transparent; }
+    .upload-box {
+      border: 2px dashed var(--border); border-radius: 10px; padding: 14px; text-align: center; background: #f8fafc; cursor: pointer; transition: background 0.2s;
+    }
+    .upload-box:hover { background: #f1f5f9; }
+    .upload-box img { max-height: 120px; margin-top: 8px; border-radius: 6px; border: 1px solid #cbd5e1; object-fit: contain; }
+
+    /* Alert Banner */
+    .alert-banner {
+      padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 0.92rem; display: none; align-items: center; gap: 8px; font-weight: 500;
+    }
+    .alert-error { background: #ffeeec; color: var(--danger); border: 1px solid #f98080; }
+
+    /* Toast Notification */
+    .toast-overlay {
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.5); display: none; align-items: center; justify-content: center; z-index: 200; padding: 16px;
+    }
+    .toast-overlay.active { display: flex; }
+    .toast-box {
+      background: #fff; border-radius: 16px; padding: 28px 24px; width: 100%; max-width: 360px; text-align: center;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2); animation: scaleUp 0.25s ease-out;
+    }
+    @keyframes scaleUp {
+      from { transform: scale(0.85); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    .toast-icon { font-size: 3.2rem; margin-bottom: 12px; }
+    .toast-title { font-size: 1.25rem; font-weight: 700; color: var(--success); margin: 0 0 8px; }
+    .toast-desc { font-size: 0.92rem; color: var(--muted); margin: 0 0 20px; line-height: 1.4; }
+
+    /* Supervisor Search & Grid */
+    .controls { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+    .search-input {
+      flex: 1; min-width: 220px; padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); font-size: 1rem; background: #fff;
+    }
+    .search-input:focus { outline: 2px solid var(--primary); border-color: transparent; }
+    .filter-select { padding: 12px; border-radius: 10px; border: 1px solid var(--border); font-size: 0.95rem; background: #fff; }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+    .card {
+      background: var(--card); border-radius: 12px; padding: 16px; box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+      border: 1px solid #e2e8f0; display: flex; flex-direction: column; justify-content: space-between; gap: 12px;
+    }
+    .card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+    .worker-name { font-size: 1.15rem; font-weight: 700; margin: 0; }
+    .worker-meta { font-size: 0.85rem; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+    .badge { background: var(--primary-light); color: var(--primary); font-weight: 600; padding: 2px 8px; border-radius: 6px; font-size: 0.8rem; white-space: nowrap; }
+
+    .card-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+    .btn-qr {
+      padding: 10px 4px; border-radius: 8px; border: none; font-weight: 700; font-size: 0.82rem; cursor: pointer;
+      text-align: center; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #fff;
+    }
+    .btn-zh { background: var(--zh-color); }
+    .btn-booking { background: var(--booking-color); }
+    .btn-cic { background: var(--cic-color); }
+    .btn-sub { font-size: 0.65rem; opacity: 0.9; font-weight: 400; }
+
+    .card-footer { border-top: 1px dashed #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; gap: 8px; flex-wrap: wrap; }
+    .status-badge { font-weight: 600; padding: 5px 8px; border-radius: 6px; cursor: pointer; border: none; font-size: 0.78rem; }
+    .status-pending { background: #fef3c7; color: #b45309; }
+    .status-done { background: #dcfce7; color: #15803d; }
+
+    .btn-delete {
+      background: #fee2e2; color: var(--danger); border: 1px solid #fecaca;
+      padding: 5px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer;
+    }
+    .btn-delete:hover { background: #fecaca; }
+
+    /* Modals */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); display: none; align-items: center; justify-content: center; z-index: 100; padding: 16px;
+    }
+    .modal-backdrop.active { display: flex; }
+    .viewer-modal { background: #fff; border-radius: 16px; width: 100%; max-width: 440px; padding: 20px; text-align: center; }
+    .viewer-tag { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 700; color: #fff; margin-bottom: 6px; }
+    .viewer-img-wrap { background: #fff; padding: 10px; border: 2px solid #e2e8f0; border-radius: 12px; min-height: 260px; display: flex; align-items: center; justify-content: center; }
+    .viewer-img-wrap img { max-width: 100%; max-height: 55vh; object-fit: contain; }
+    .viewer-switch { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 14px; }
+
+    /* Password Modal */
+    .pwd-modal { background: #fff; border-radius: 16px; width: 100%; max-width: 360px; padding: 24px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+    .pwd-input { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 1.1rem; text-align: center; letter-spacing: 2px; margin: 12px 0; }
+    .pwd-input:focus { outline: 2px solid var(--primary); border-color: transparent; }
+    .pwd-error { color: var(--danger); font-size: 0.85rem; margin-bottom: 10px; display: none; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <div>
+      <h1>地盤入職訓練二維碼雲端系統</h1>
+      <p id="headerSubtitle">【判頭提交界面】專用上傳通道</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-switch" id="modeSwitchBtn" onclick="handleModeSwitchClick()">🔒 切換負責人後台</button>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- 界面一：判頭提交資料 -->
+  <div id="submitView" class="view-section active">
+    <div class="form-card" id="formCardBox">
+      <h2>工友入職二維碼與授權截圖上傳</h2>
+      <p style="font-size:0.88rem; color:var(--muted); margin-bottom:16px;">請填寫工友資料並上傳 3 張截圖（嚴禁上傳身份證等個人私隱證件）。</p>
+      
+      <div id="formAlert" class="alert-banner"></div>
+
+      <div class="form-group">
+        <div class="form-group-header"><label>工友姓名 *</label></div>
+        <input type="text" id="wName" placeholder="例如：陳大文" oninput="saveDraft()" />
+      </div>
+      <div class="form-group">
+        <div class="form-group-header"><label>建造業工人註冊編號 (CWR) *</label></div>
+        <input type="text" id="wCwr" placeholder="例如：CWR123456" oninput="saveDraft()" />
+      </div>
+      <div class="form-group">
+        <div class="form-group-header"><label>訓練日期 *</label></div>
+        <input type="date" id="wDate" onchange="saveDraft()" />
+      </div>
+
+      <div class="form-group">
+        <div class="form-group-header">
+          <label>1. 零傷害二維碼截圖 *</label>
+        </div>
+        <div class="upload-box" onclick="document.getElementById('zhCardFile').click()">
+          <span id="zhCardText">點擊上傳零傷害二維碼</span>
+          <img id="zhCardPreview" style="display:none" alt="預覽" />
+        </div>
+        <input type="file" id="zhCardFile" accept="image/*" style="display:none" onchange="previewImage(event, 'zhCard')" />
+      </div>
+
+      <div class="form-group">
+        <div class="form-group-header">
+          <label>2. 入職培訓預約二維碼截圖 *</label>
+        </div>
+        <div class="upload-box" onclick="document.getElementById('bookingFile').click()">
+          <span id="bookingText">點擊上傳預約二維碼</span>
+          <img id="bookingPreview" style="display:none" alt="預覽" />
+        </div>
+        <input type="file" id="bookingFile" accept="image/*" style="display:none" onchange="previewImage(event, 'booking')" />
+      </div>
+
+      <div class="form-group">
+        <div class="form-group-header">
+          <label>3. CIC 安全表現紀錄「授權完成」截圖 *</label>
+        </div>
+        <div class="upload-box" onclick="document.getElementById('cicFile').click()">
+          <span id="cicText">點擊上傳 CIC 授權畫面</span>
+          <img id="cicPreview" style="display:none" alt="預覽" />
+        </div>
+        <input type="file" id="cicFile" accept="image/*" style="display:none" onchange="previewImage(event, 'cic')" />
+      </div>
+
+      <button id="submitBtn" class="btn" style="background:var(--primary); color:#fff; width:100%; padding:14px; justify-content:center; font-size:1rem; margin-top:10px;" onclick="submitWorkerData()">
+        立即上傳並提交至雲端
+      </button>
+    </div>
+  </div>
+
+  <!-- 界面二：負責人後台管理與檢索 -->
+  <div id="adminView" class="view-section">
+    <div class="controls">
+      <input type="text" id="searchInput" class="search-input" placeholder="按姓名或 CWR 編號即時搜尋..." oninput="renderAdminList()" />
+      <select id="statusFilter" class="filter-select" onchange="renderAdminList()">
+        <option value="all">全部狀態</option>
+        <option value="pending">未完成報到</option>
+        <option value="done">已完成報到</option>
+      </select>
+    </div>
+    <div style="font-size:0.85rem; color:var(--muted); margin-bottom:12px;" id="adminCountLabel">正在從 Firebase 雲端同步資料...</div>
+    <div class="grid" id="adminGrid"></div>
+  </div>
+
+</div>
+
+<!-- 後台密碼驗證 Modal -->
+<div class="modal-backdrop" id="pwdModal" onclick="if(event.target===this) closePwdModal()">
+  <div class="pwd-modal">
+    <div style="font-size:2.4rem; margin-bottom:6px;">🔐</div>
+    <h3 style="margin:0 0 6px; color:var(--primary);">負責人後台驗證</h3>
+    <p style="font-size:0.85rem; color:var(--muted); margin:0;">請輸入管理員密碼以檢視及管理工友資料</p>
+    <input type="password" id="adminPwdInput" class="pwd-input" placeholder="輸入密碼" onkeydown="if(event.key==='Enter') verifyAdminPwd()" />
+    <div id="pwdErrorMsg" class="pwd-error">❌ 密碼錯誤，請重新輸入</div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px;">
+      <button class="btn" style="background:#e2e8f0; color:#0f172a; justify-content:center;" onclick="closePwdModal()">取消</button>
+      <button class="btn" style="background:var(--primary); color:#fff; justify-content:center;" onclick="verifyAdminPwd()">確認登入</button>
+    </div>
+  </div>
+</div>
+
+<!-- 刪除確認 Modal -->
+<div class="modal-backdrop" id="deleteModal" onclick="if(event.target===this) closeDeleteModal()">
+  <div class="pwd-modal">
+    <div style="font-size:2.4rem; margin-bottom:6px;">🗑️</div>
+    <h3 style="margin:0 0 8px; color:var(--danger);">確認刪除資料？</h3>
+    <p id="deleteConfirmDesc" style="font-size:0.88rem; color:var(--muted); margin:0 0 18px; line-height:1.4;">刪除後將從雲端永久移除，無法復原。</p>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+      <button class="btn" style="background:#e2e8f0; color:#0f172a; justify-content:center;" onclick="closeDeleteModal()">取消</button>
+      <button id="confirmDeleteBtn" class="btn" style="background:var(--danger); color:#fff; justify-content:center;" onclick="executeDeleteWorker()">確認刪除</button>
+    </div>
+  </div>
+</div>
+
+<!-- 上傳成功彈出提示 Modal -->
+<div class="toast-overlay" id="successToast">
+  <div class="toast-box">
+    <div class="toast-icon">✅</div>
+    <h3 class="toast-title">上傳成功！</h3>
+    <p class="toast-desc">工友資料及截圖已成功同步至雲端資料庫。</p>
+    <button class="btn btn-switch" style="width:100%; justify-content:center; padding:12px; font-size:1rem;" onclick="closeToastAndReset()">
+      繼續提交下一位工友
+    </button>
+  </div>
+</div>
+
+<!-- 圖片放大檢視器 Modal -->
+<div class="modal-backdrop" id="viewerModal" onclick="if(event.target===this) closeViewer()">
+  <div class="viewer-modal">
+    <div id="vTag" class="viewer-tag">標籤</div>
+    <h3 id="vName" style="margin:4px 0;">姓名</h3>
+    <div id="vSub" style="font-size:0.85rem; color:var(--muted); margin-bottom:10px;">CWR</div>
+    <div class="viewer-img-wrap">
+      <img id="vImg" src="" alt="QR" />
+    </div>
+    <div class="viewer-switch">
+      <button class="btn-qr btn-zh" onclick="switchViewer('zhCard')">1. 零傷害碼</button>
+      <button class="btn-qr btn-booking" onclick="switchViewer('booking')">2. 預約碼</button>
+      <button class="btn-qr btn-cic" onclick="switchViewer('cic')">3. CIC授權</button>
+    </div>
+    <button class="btn" style="width:100%; margin-top:12px; background:#e2e8f0; color:#0f172a; justify-content:center;" onclick="closeViewer()">關閉返回</button>
+  </div>
+</div>
+
+<script>
+  // ==========================================
+  // 系統密碼設定 (預設密碼: 1801)
+  // ==========================================
+  const ADMIN_PASSWORD = "1801";
+
+  // ==========================================
+  // Firebase 專案設定與初始化
+  // ==========================================
+  const firebaseConfig = {
+    apiKey: "AIzaSyCXlF1kcvha3VmyuHzaP8soEOHuJ3FxXHI",
+    authDomain: "site-safety-induction.firebaseapp.com",
+    projectId: "site-safety-induction",
+    storageBucket: "site-safety-induction.firebasestorage.app",
+    messagingSenderId: "386264942127",
+    appId: "1:386264942127:web:fee4e519e450066b4c68da"
+  };
+
+  let db = null;
+  let cloudWorkers = [];
+  let unsubWorkers = null;
+
+  try {
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    db = firebase.firestore();
+  } catch (e) {
+    console.warn("Firebase 初始化警告：", e);
+  }
+
+  let tempZhCard = '';
+  let tempBooking = '';
+  let tempCic = '';
+  let activeViewerWorkerId = null;
+  let activeViewerType = 'zhCard';
+  let pendingDeleteWorkerId = null;
+  let isAdminAuthenticated = false;
+  let isAdminMode = false;
+
+  // ==========================================
+  // 草稿自動儲存與還原
+  // ==========================================
+  function saveDraft() {
+    const draft = {
+      name: document.getElementById('wName').value,
+      cwr: document.getElementById('wCwr').value,
+      date: document.getElementById('wDate').value
+    };
+    localStorage.setItem('worker_draft', JSON.stringify(draft));
+  }
+
+  function loadDraft() {
+    const saved = localStorage.getItem('worker_draft');
+    if (saved) {
+      try {
+        const d = JSON.parse(saved);
+        if (d.name) document.getElementById('wName').value = d.name;
+        if (d.cwr) document.getElementById('wCwr').value = d.cwr;
+        if (d.date) document.getElementById('wDate').value = d.date;
+      } catch (err) {
+        console.error("讀取草稿失敗", err);
+      }
+    }
+  }
+
+  // ==========================================
+  // 圖片預覽與壓縮處理
+  // ==========================================
+  function previewImage(event, type) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 800;
+        const MAX_HEIGHT = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+        if (type === 'zhCard') {
+          tempZhCard = dataUrl;
+          const prev = document.getElementById('zhCardPreview');
+          prev.src = dataUrl;
+          prev.style.display = 'block';
+          document.getElementById('zhCardText').style.display = 'none';
+        } else if (type === 'booking') {
+          tempBooking = dataUrl;
+          const prev = document.getElementById('bookingPreview');
+          prev.src = dataUrl;
+          prev.style.display = 'block';
+          document.getElementById('bookingText').style.display = 'none';
+        } else if (type === 'cic') {
+          tempCic = dataUrl;
+          const prev = document.getElementById('cicPreview');
+          prev.src = dataUrl;
+          prev.style.display = 'block';
+          document.getElementById('cicText').style.display = 'none';
+        }
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // ==========================================
+  // 提交資料至雲端
+  // ==========================================
+  function submitWorkerData() {
+    const name = document.getElementById('wName').value.trim();
+    const cwr = document.getElementById('wCwr').value.trim();
+    const date = document.getElementById('wDate').value;
+    const alertBox = document.getElementById('formAlert');
+
+    if (!name || !cwr || !date || !tempZhCard || !tempBooking || !tempCic) {
+      alertBox.innerHTML = `⚠️ <b>請填寫完整資訊並上傳全部 3 張截圖！</b>`;
+      alertBox.className = 'alert-banner alert-error';
+      alertBox.style.display = 'flex';
+      return;
+    }
+    alertBox.style.display = 'none';
+
+    const payload = {
+      name: name,
+      cwr: cwr.toUpperCase(),
+      date: date,
+      zhCard: tempZhCard,
+      booking: tempBooking,
+      cic: tempCic,
+      status: 'pending',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.innerText = '正在上傳至雲端...';
+
+    if (db) {
+      db.collection('workers').add(payload)
+        .then(() => {
+          localStorage.removeItem('worker_draft');
+          document.getElementById('successToast').classList.add('active');
+          btn.disabled = false;
+          btn.innerText = '立即上傳並提交至雲端';
+        })
+        .catch((err) => {
+          console.error(err);
+          alertBox.innerHTML = `⚠️ <b>上傳失敗：</b> ${err.message}`;
+          alertBox.className = 'alert-banner alert-error';
+          alertBox.style.display = 'flex';
+          btn.disabled = false;
+          btn.innerText = '立即上傳並提交至雲端';
+        });
+    } else {
+      setTimeout(() => {
+        document.getElementById('successToast').classList.add('active');
+        btn.disabled = false;
+        btn.innerText = '立即上傳並提交至雲端';
+      }, 500);
+    }
+  }
+
+  function closeToastAndReset() {
+    document.getElementById('successToast').classList.remove('active');
+    document.getElementById('wName').value = '';
+    document.getElementById('wCwr').value = '';
+    document.getElementById('wDate').value = '';
+    tempZhCard = '';
+    tempBooking = '';
+    tempCic = '';
+    
+    ['zhCard', 'booking', 'cic'].forEach(t => {
+      document.getElementById(t + 'Preview').style.display = 'none';
+      document.getElementById(t + 'Text').style.display = 'block';
+      document.getElementById(t + 'File').value = '';
+    });
+  }
+
+  // ==========================================
+  // 後台管理、實時監聽與刪除功能
+  // ==========================================
+  function initAdminListener() {
+    if (!db) return;
+    if (unsubWorkers) unsubWorkers();
+
+    unsubWorkers = db.collection('workers').orderBy('createdAt', 'desc')
+      .onSnapshot((snapshot) => {
+        cloudWorkers = [];
+        snapshot.forEach((doc) => {
+          cloudWorkers.push({ id: doc.id, ...doc.data() });
+        });
+        renderAdminList();
+      }, (err) => {
+        console.error("監聽雲端資料錯誤：", err);
+        document.getElementById('adminCountLabel').innerText = "載入雲端資料失敗，請檢查網絡。";
+      });
+  }
+
+  function renderAdminList() {
+    const grid = document.getElementById('adminGrid');
+    const search = document.getElementById('searchInput').value.trim().toLowerCase();
+    const statusFilter = document.getElementById('statusFilter').value;
+    const countLabel = document.getElementById('adminCountLabel');
+
+    let filtered = cloudWorkers.filter(w => {
+      const matchText = (w.name + ' ' + w.cwr).toLowerCase().includes(search);
+      const matchStatus = statusFilter === 'all' || w.status === statusFilter;
+      return matchText && matchStatus;
+    });
+
+    countLabel.innerText = `目前共顯示 ${filtered.length} 位工友記錄（雲端即時同步）`;
+
+    if (filtered.length === 0) {
+      grid.innerHTML = `<div style="grid-column: 1/-1; text-align:center; padding: 40px; color:var(--muted);">沒有找到符合條件的工友記錄。</div>`;
+      return;
+    }
+
+    grid.innerHTML = filtered.map(w => `
+      <div class="card">
+        <div>
+          <div class="card-header">
+            <div>
+              <h3 class="worker-name">${escapeHtml(w.name)}</h3>
+              <div class="worker-meta">CWR: <b>${escapeHtml(w.cwr)}</b> | 訓練日: ${w.date || '未填'}</div>
+            </div>
+            <span class="badge">已上傳3截圖</span>
+          </div>
+        </div>
+        
+        <div class="card-actions">
+          <button class="btn-qr btn-zh" onclick="openViewer('${w.id}', 'zhCard')">
+            <span>1. 零傷害碼</span>
+            <span class="btn-sub">檢視截圖</span>
+          </button>
+          <button class="btn-qr btn-booking" onclick="openViewer('${w.id}', 'booking')">
+            <span>2. 預約碼</span>
+            <span class="btn-sub">檢視截圖</span>
+          </button>
+          <button class="btn-qr btn-cic" onclick="openViewer('${w.id}', 'cic')">
+            <span>3. CIC授權</span>
+            <span class="btn-sub">檢視截圖</span>
+          </button>
+        </div>
+
+        <div class="card-footer">
+          <button class="status-badge ${w.status === 'done' ? 'status-done' : 'status-pending'}" onclick="toggleStatus('${w.id}', '${w.status}')">
+            ${w.status === 'done' ? '✅ 已完成報到' : '⏳ 未完成報到 (點擊切換)'}
+          </button>
+          <button class="btn-delete" onclick="promptDeleteWorker('${w.id}', '${escapeHtml(w.name)}')">🗑️ 刪除</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function toggleStatus(id, currentStatus) {
+    const newStatus = currentStatus === 'done' ? 'pending' : 'done';
+    if (db) {
+      db.collection('workers').doc(id).update({ status: newStatus })
+        .catch(err => alert("更新狀態失敗：" + err.message));
+    }
+  }
+
+  function promptDeleteWorker(id, name) {
+    pendingDeleteWorkerId = id;
+    document.getElementById('deleteConfirmDesc').innerHTML = `確定要刪除工友 <b>「${name}」</b> 的所有資料與截圖嗎？<br>刪除後將從雲端永久移除，無法復原。`;
+    document.getElementById('deleteModal').classList.add('active');
+  }
+
+  function closeDeleteModal() {
+    pendingDeleteWorkerId = null;
+    document.getElementById('deleteModal').classList.remove('active');
+  }
+
+  function executeDeleteWorker() {
+    if (!pendingDeleteWorkerId || !db) return;
+    const btn = document.getElementById('confirmDeleteBtn');
+    btn.disabled = true;
+    btn.innerText = '刪除中...';
+
+    db.collection('workers').doc(pendingDeleteWorkerId).delete()
+      .then(() => {
+        closeDeleteModal();
+        btn.disabled = false;
+        btn.innerText = '確認刪除';
+      })
+      .catch(err => {
+        alert("刪除失敗：" + err.message);
+        btn.disabled = false;
+        btn.innerText = '確認刪除';
+      });
+  }
+
+  // ==========================================
+  // 圖片檢視器 Modal
+  // ==========================================
+  function openViewer(workerId, type) {
+    activeViewerWorkerId = workerId;
+    activeViewerType = type;
+    updateViewerContent();
+    document.getElementById('viewerModal').classList.add('active');
+  }
+
+  function switchViewer(type) {
+    activeViewerType = type;
+    updateViewerContent();
+  }
+
+  function updateViewerContent() {
+    const worker = cloudWorkers.find(w => w.id === activeViewerWorkerId);
+    if (!worker) return;
+
+    document.getElementById('vName').innerText = worker.name;
+    document.getElementById('vSub').innerText = `CWR: ${worker.cwr}`;
+    
+    const tag = document.getElementById('vTag');
+    const img = document.getElementById('vImg');
+
+    if (activeViewerType === 'zhCard') {
+      tag.innerText = '1. 零傷害二維碼截圖';
+      tag.style.background = 'var(--zh-color)';
+      img.src = worker.zhCard;
+    } else if (activeViewerType === 'booking') {
+      tag.innerText = '2. 培訓預約二維碼截圖';
+      tag.style.background = 'var(--booking-color)';
+      img.src = worker.booking;
+    } else if (activeViewerType === 'cic') {
+      tag.innerText = '3. CIC安全授權截圖';
+      tag.style.background = 'var(--cic-color)';
+      img.src = worker.cic;
+    }
+  }
+
+  function closeViewer() {
+    document.getElementById('viewerModal').classList.remove('active');
+  }
+
+  // ==========================================
+  // 後台密碼驗證與介面切換
+  // ==========================================
+  function handleModeSwitchClick() {
+    if (isAdminMode) {
+      applyModeSwitch(false);
+    } else {
+      if (isAdminAuthenticated) {
+        applyModeSwitch(true);
+      } else {
+        document.getElementById('adminPwdInput').value = '';
+        document.getElementById('pwdErrorMsg').style.display = 'none';
+        document.getElementById('pwdModal').classList.add('active');
+        setTimeout(() => document.getElementById('adminPwdInput').focus(), 100);
+      }
+    }
+  }
+
+  function closePwdModal() {
+    document.getElementById('pwdModal').classList.remove('active');
+  }
+
+  function verifyAdminPwd() {
+    const input = document.getElementById('adminPwdInput').value;
+    if (input === ADMIN_PASSWORD) {
+      isAdminAuthenticated = true;
+      closePwdModal();
+      applyModeSwitch(true);
+    } else {
+      document.getElementById('pwdErrorMsg').style.display = 'block';
+      document.getElementById('adminPwdInput').value = '';
+      document.getElementById('adminPwdInput').focus();
+    }
+  }
+
+  function applyModeSwitch(toAdmin) {
+    isAdminMode = toAdmin;
+    const submitView = document.getElementById('submitView');
+    const adminView = document.getElementById('adminView');
+    const switchBtn = document.getElementById('modeSwitchBtn');
+    const subtitle = document.getElementById('headerSubtitle');
+
+    if (isAdminMode) {
+      submitView.classList.remove('active');
+      adminView.classList.add('active');
+      switchBtn.innerText = '切換判頭提交界面';
+      subtitle.innerText = '【負責人後台管理】即時監控與審核';
+      initAdminListener();
+    } else {
+      adminView.classList.remove('active');
+      submitView.classList.add('active');
+      switchBtn.innerText = '🔒 切換負責人後台';
+      subtitle.innerText = '【判頭提交界面】專用上傳通道';
+    }
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+  }
+
+  // 頁面初次載入
+  window.addEventListener('DOMContentLoaded', () => {
+    loadDraft();
+  });
+</script>
+
+</body>
+</html>
